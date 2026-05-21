@@ -1,6 +1,6 @@
 {
   "name": "@quelvio/cli",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Quelvio command-line interface.",
   "license": "MIT",
   "type": "module",
@@ -29,7 +29,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "commander": "^12.1.0"
+    "commander": "^12.1.0",
+    "picocolors": "^1.1.1"
+  },
+  "optionalDependencies": {
+    "keytar": "^7.9.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
