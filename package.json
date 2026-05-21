@@ -1,0 +1,41 @@
+{
+  "name": "@quelvio/cli",
+  "version": "0.0.0",
+  "description": "Quelvio command-line interface.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "quelvio": "./dist/index.js"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=20.10"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Quelvio/quelvio-cli.git"
+  },
+  "homepage": "https://quelvio.com/docs/cli",
+  "bugs": {
+    "url": "https://github.com/Quelvio/quelvio-cli/issues"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^20.17.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
+  }
+}
