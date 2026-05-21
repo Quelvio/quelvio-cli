@@ -4,9 +4,13 @@ import { registerDomainsCommand } from './commands/domains.js';
 import { registerQueryCommand } from './commands/query.js';
 import { registerSourceCommand } from './commands/source.js';
 import { registerWhoamiCommand } from './commands/whoami.js';
-import { QuelvioError, RateLimitError } from './errors.js';
+import { AuthError, QuelvioError, RateLimitError } from './errors.js';
 import { formatError } from './output/formatters.js';
 import { VERSION } from './version.js';
+
+function isVerbose(): boolean {
+  return process.argv.includes('--verbose');
+}
 
 export function buildProgram(): Command {
   const program = new Command();
@@ -50,6 +54,9 @@ export function run(argv: readonly string[]): void {
 function handleError(err: unknown): number {
   if (err instanceof QuelvioError) {
     process.stderr.write(`${formatError(err)}\n`);
+    if (err instanceof AuthError && err.backendDetail && isVerbose()) {
+      process.stderr.write(`debug: backend response: ${err.backendDetail}\n`);
+    }
     if (err instanceof RateLimitError && err.retryAfterSeconds !== null) {
       process.stderr.write(`hint: retry in ${err.retryAfterSeconds}s\n`);
     }

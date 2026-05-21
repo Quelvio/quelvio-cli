@@ -16,11 +16,19 @@ export class GenericError extends QuelvioError {
 }
 
 export class AuthError extends QuelvioError {
-  constructor(message: string) {
+  readonly backendDetail: string | null;
+
+  constructor(message: string, backendDetail: string | null = null) {
     super(message, 2);
     this.name = 'AuthError';
+    this.backendDetail = backendDetail;
   }
 }
+
+export const AUTH_FAILED_MESSAGE =
+  'Authentication failed. Your token may be invalid, expired, or revoked.\n' +
+  'Generate a new Personal Access Token at https://enterprise.quelvio.com/account\n' +
+  'and set it via: export QUELVIO_TOKEN=qlv_pat_...';
 
 export class NotAuthenticatedError extends AuthError {
   constructor() {

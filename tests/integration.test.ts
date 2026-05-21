@@ -87,6 +87,30 @@ describe('integration: auth required', () => {
   });
 });
 
+describe('integration: 401 message rendering', () => {
+  it('default 401 surface is friendly and never says "JWT"', () => {
+    const r = runCli(['whoami'], {
+      env: { QUELVIO_TOKEN: 'qlv_pat_bogus_for_rendering_test' },
+    });
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/Authentication failed/);
+    expect(r.stderr).toMatch(/invalid, expired, or revoked/);
+    expect(r.stderr).toMatch(/enterprise\.quelvio\.com\/account/);
+    expect(r.stderr).toMatch(/QUELVIO_TOKEN=qlv_pat_/);
+    expect(r.stderr).not.toMatch(/JWT/);
+    expect(r.stderr).not.toMatch(/debug: backend response/);
+  });
+
+  it('--verbose adds a debug line with the backend detail', () => {
+    const r = runCli(['whoami', '--verbose'], {
+      env: { QUELVIO_TOKEN: 'qlv_pat_bogus_for_rendering_test' },
+    });
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/Authentication failed/);
+    expect(r.stderr).toMatch(/debug: backend response:/);
+  });
+});
+
 describe('integration: config command', () => {
   it('set / get / list / unset roundtrip', () => {
     let r = runCli(['config', 'set', 'default_mode', 'deep']);

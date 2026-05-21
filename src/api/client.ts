@@ -1,6 +1,7 @@
 import { arch, platform } from 'node:os';
 import { readConfigFile } from '../config/store.js';
 import {
+  AUTH_FAILED_MESSAGE,
   AuthError,
   GenericError,
   NetworkError,
@@ -188,7 +189,7 @@ export class ApiClient {
 
     switch (response.status) {
       case 401:
-        return new AuthError(`Authentication failed: ${message}`);
+        return new AuthError(AUTH_FAILED_MESSAGE, detail);
       case 403:
         return new ScopeError(`Forbidden: ${message}`);
       case 404:

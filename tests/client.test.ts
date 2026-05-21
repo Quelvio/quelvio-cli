@@ -38,9 +38,9 @@ describe('ApiClient', () => {
     expect((init as { body: string }).body).toBe(JSON.stringify({ q: 'x' }));
   });
 
-  it('maps 401 → AuthError(exit 2)', async () => {
+  it('maps 401 → AuthError(exit 2) with friendly message + stashed backend detail', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ detail: 'Invalid token' }), {
+      new Response(JSON.stringify({ detail: 'Invalid JWT token.' }), {
         status: 401,
         headers: { 'content-type': 'application/json' },
       }),
@@ -50,7 +50,16 @@ describe('ApiClient', () => {
       baseUrl: 'https://x',
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
-    await expect(client.request({ path: '/v1/x' })).rejects.toBeInstanceOf(AuthError);
+    const err = await client.request({ path: '/v1/x' }).catch((e) => e);
+    expect(err).toBeInstanceOf(AuthError);
+    // Friendly default message — never surface "JWT" since PATs are not JWTs.
+    expect((err as AuthError).message).toMatch(/Authentication failed/);
+    expect((err as AuthError).message).toMatch(/invalid, expired, or revoked/);
+    expect((err as AuthError).message).toMatch(/enterprise\.quelvio\.com\/account/);
+    expect((err as AuthError).message).toMatch(/QUELVIO_TOKEN=qlv_pat_/);
+    expect((err as AuthError).message).not.toMatch(/JWT/);
+    // Backend detail preserved for --verbose debugging.
+    expect((err as AuthError).backendDetail).toBe('Invalid JWT token.');
   });
 
   it('maps 403 → ScopeError(exit 6)', async () => {
