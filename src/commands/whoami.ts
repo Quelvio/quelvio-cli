@@ -7,26 +7,20 @@ import {
 } from '../output/formatters.js';
 import { type CommonOpts, addCommonOpts, buildClient, emitJson } from './common.js';
 
-function authMethodFor(token: string): WhoamiContext['authMethod'] {
-  if (token.startsWith('qlv_sa_')) return 'service-account';
-  if (token.startsWith('qlv_oauth_')) return 'oauth';
-  return 'pat';
-}
-
 export function registerWhoamiCommand(program: Command): void {
   const cmd = program.command('whoami').description('Show the signed-in user and tenant');
 
   addCommonOpts(cmd);
 
   cmd.action(async (opts: CommonOpts) => {
-    const { client, token } = await buildClient(opts);
+    const { client, token, authMethod } = await buildClient(opts);
     const resp = await client.request<WhoamiResponse>({
       method: 'GET',
       path: '/v1/enterprise/me',
     });
     const ctx: WhoamiContext = {
       tokenPrefix: redactToken(token),
-      authMethod: authMethodFor(token),
+      authMethod,
     };
     if (opts.json) {
       emitJson({ ...resp, auth_method: ctx.authMethod });

@@ -1,6 +1,8 @@
 import { Command } from 'commander';
 import { registerConfigCommand } from './commands/config.js';
 import { registerDomainsCommand } from './commands/domains.js';
+import { registerLoginCommand } from './commands/login.js';
+import { registerLogoutCommand } from './commands/logout.js';
 import { registerQueryCommand } from './commands/query.js';
 import { registerSourceCommand } from './commands/source.js';
 import { registerWhoamiCommand } from './commands/whoami.js';
@@ -20,6 +22,8 @@ export function buildProgram(): Command {
     .description('Quelvio command-line interface — query your enterprise knowledge brain')
     .version(VERSION, '-v, --version', 'output the current version');
 
+  registerLoginCommand(program);
+  registerLogoutCommand(program);
   registerQueryCommand(program);
   registerDomainsCommand(program);
   registerSourceCommand(program);

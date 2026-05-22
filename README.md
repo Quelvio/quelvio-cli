@@ -30,20 +30,31 @@ Node 20.10 or newer is required.
 
 ## Quickstart
 
-1. Generate a Personal Access Token in the dashboard:
-   <https://enterprise.quelvio.com/account> → **Personal API Keys** → **Create token**.
-2. Export it:
+1. Sign in:
    ```sh
-   export QUELVIO_TOKEN=qlv_pat_<your-key>
+   quelvio login
    ```
-3. Verify auth works:
+   This opens `enterprise.quelvio.com/device` in your browser, displays a
+   short user code, and waits for you to approve. The resulting OAuth token
+   is stored in your OS keychain (or `~/.quelvio/config.json` if the keychain
+   is unavailable).
+2. Verify auth works:
    ```sh
    quelvio whoami
    ```
-4. Ask the brain a question:
+3. Ask the brain a question:
    ```sh
    quelvio query "what is our deployment process?"
    ```
+
+**Headless / CI?** Skip `quelvio login` and use a Personal Access Token
+instead — generate one at <https://enterprise.quelvio.com/account> →
+**Personal API Keys** → **Create token**, then:
+
+```sh
+export QUELVIO_TOKEN=qlv_pat_<your-key>
+quelvio whoami
+```
 
 ## Authentication
 
@@ -52,20 +63,53 @@ Node 20.10 or newer is required.
 | Precedence | Source                  | Notes                                                                  |
 | ---------- | ----------------------- | ---------------------------------------------------------------------- |
 | 1          | `--token <t>` flag      | Overrides everything; never persisted.                                 |
-| 2          | `QUELVIO_TOKEN` env var | The recommended way to run the CLI in CI and ad-hoc shells.            |
-| 3          | OS keychain             | Populated by `quelvio login` (ships in Phase 6 / 0.2.x).               |
-| 4          | `~/.quelvio/config.json`| Fallback when the OS keychain is unavailable (e.g. headless Linux).    |
+| 2          | `QUELVIO_TOKEN` env var | Headless fallback — PAT for CI, bots, and ad-hoc shells.               |
+| 3          | OS keychain             | Populated by `quelvio login`; default for interactive use.             |
+| 4          | `~/.quelvio/config.json`| Used when the OS keychain is unavailable (e.g. headless Linux).        |
 
-The token is never echoed to stdout, stderr, or logs. The keychain or config file holds the value at rest; `--verbose` HTTP traces redact the `Authorization` header.
+The token is never echoed to stdout, stderr, or logs. The keychain or config file holds the value at rest; `--verbose` HTTP traces redact the `Authorization` header. Refresh tokens are treated the same as access tokens — never logged, never printed.
 
-**Authentication methods on the roadmap:**
-- **PAT (this release).** A long-lived bearer token tied to a human user. Every query is attributed to that user; permissions and rate limits apply per identity.
-- **OAuth login** (Phase 6). `quelvio login` will perform a browser-based device-code flow and stash the resulting token in your OS keychain.
-- **Service accounts** (Phase 8/9). For headless agents and CI bots that need an identity distinct from a human's.
+**Authentication methods:**
+- **OAuth device login (default in 0.2.0).** `quelvio login` performs the
+  RFC 8628 device-code flow against `api.quelvio.com`. The CLI persists an
+  access + refresh pair in your OS keychain; the resolver auto-refreshes
+  within 5 minutes of expiry. `quelvio logout` revokes server-side and wipes
+  the local entry.
+- **PAT (headless fallback).** A long-lived bearer token tied to a human user.
+  Set via `QUELVIO_TOKEN`. Best for CI workflows and ad-hoc shell scripts.
+- **Service accounts** (Phase 8/9). For headless agents and CI bots that need
+  an identity distinct from a human's.
 
 ## Commands
 
-Every command supports the global flags `--token <t>`, `--json`, `--no-color`, `--verbose`, and `--quiet`. Use `quelvio <command> --help` for the full flag list.
+Most commands support the global flags `--token <t>`, `--json`, `--no-color`, `--verbose`, and `--quiet`. Use `quelvio <command> --help` for the full flag list. (`login` and `logout` accept only `--verbose` and, for `login`, `--no-browser`.)
+
+### `quelvio login`
+
+Sign in interactively via the OAuth 2.0 Device Authorization Grant (RFC 8628).
+
+```sh
+quelvio login            # opens the verification URL in your browser
+quelvio login --no-browser   # prints the URL instead — useful over SSH
+```
+
+The CLI prints a short user code (e.g. `BCDF-GHJK`), polls
+`api.quelvio.com/oauth/token` at the advertised interval, and writes the
+resulting `{access_token, refresh_token, expires_at}` triple to your OS
+keychain. Subsequent commands authenticate transparently — no environment
+variable needed. The token resolver auto-refreshes when within 5 minutes of
+expiry; if the refresh fails (e.g. the refresh token was revoked server-side)
+you'll be prompted to run `quelvio login` again.
+
+### `quelvio logout`
+
+Revoke the stored OAuth tokens (best-effort) and remove the local entry.
+
+```sh
+quelvio logout
+```
+
+Idempotent: exits 0 with `Not logged in.` if no token is present.
 
 ### `quelvio query <text>`
 
@@ -263,7 +307,6 @@ A first-party agent skills package (separate repo) will ship in Phase 12 with co
 
 ## Limitations
 
-- **OAuth login is not yet implemented.** Use `QUELVIO_TOKEN` (a PAT) for now. `quelvio login` ships in 0.2.0 (Phase 6).
 - **Streaming is best-effort.** `--stream` falls back to non-streaming on backends that don't expose `/v1/enterprise/query/stream` or return a non-SSE content-type.
 - **No offline mode.** Every command except `config` requires connectivity to `api.quelvio.com`.
 - **Result count clamped at 10.** The backend caps `--max-sources` at 10 to match marketplace behavior; values above 10 are silently clamped down.

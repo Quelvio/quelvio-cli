@@ -1,8 +1,16 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { CONFIG_DIR, CONFIG_FILE } from './paths.js';
 
+export type StoredAuth = {
+  access_token: string;
+  refresh_token?: string;
+  expires_at?: number;
+  source: 'oauth' | 'pat';
+};
+
 export type ConfigFile = {
   token?: string;
+  auth?: StoredAuth;
   api_base?: string;
   default_mode?: string;
   default_max_sources?: number;
