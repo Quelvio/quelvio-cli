@@ -245,7 +245,22 @@ Inside a Claude Code session, the CLI is the recommended way to ask Quelvio ques
 quelvio query "what is the rollback procedure for production deploys?"
 ```
 
-A first-party agent skills package (separate repo) will ship in Phase 12 with conversational wrappers, follow-up handling, and `get_source_detail`-aware citation walking. Until then, treat `quelvio` as a normal shell tool.
+For mode-selection heuristics, citation handling, and per-agent installation, see the [AI Agents](#ai-agents) section below.
+
+## AI Agents
+
+The Quelvio CLI is designed to be invoked directly by AI coding agents like Claude Code, Cursor, and OpenAI Codex. Per-agent skill files that teach when and how to use `quelvio` are published at:
+
+[github.com/Quelvio/quelvio-agent-skills](https://github.com/Quelvio/quelvio-agent-skills)
+
+Each agent flavor has its own `SKILL.md` with mode selection heuristics, output handling guidance, and composition patterns. To install:
+
+- **Claude Code** — copy `claude-code/SKILL.md` to `~/.claude/skills/quelvio/SKILL.md` (user-scoped) or `.claude/skills/quelvio/SKILL.md` (project-scoped).
+- **Cursor** — copy `cursor/SKILL.md` to `.cursor/rules/quelvio.mdc`.
+- **OpenAI Codex CLI** — copy `codex/SKILL.md` to your `AGENTS.md` (project-scoped) or `~/.codex/AGENTS.md` (global).
+- **MCP-compatible agents** — include `mcp-generic/SKILL.md` as a system-prompt addendum or tool-description file.
+
+The skills repo is MIT-licensed and open to contributions.
 
 ## Troubleshooting
 
