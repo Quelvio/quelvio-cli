@@ -30,6 +30,14 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Publish (placeholder, scaffold tag only)
+      - name: Test
+        run: pnpm test
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Publish to npm
         if: ${{ !contains(github.ref_name, 'scaffold') }}
-        run: pnpm publish --provenance --access public --no-git-checks
+        run: pnpm publish --provenance --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
