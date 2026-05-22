@@ -4,10 +4,15 @@
   "description": "Quelvio command-line interface.",
   "license": "MIT",
   "type": "module",
+  "main": "./dist/index.js",
   "bin": {
     "quelvio": "./dist/index.js"
   },
   "files": ["dist", "README.md", "LICENSE"],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "engines": {
     "node": ">=20.10"
   },
