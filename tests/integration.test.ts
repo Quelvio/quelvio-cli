@@ -45,10 +45,10 @@ function runCli(args: string[], opts: RunOpts = {}) {
 }
 
 describe('integration: --version / --help', () => {
-  it('--version prints 0.3.0', () => {
+  it('--version prints 0.4.0', () => {
     const r = runCli(['--version']);
     expect(r.status).toBe(0);
-    expect(r.stdout.trim()).toBe('0.3.0');
+    expect(r.stdout.trim()).toBe('0.4.0');
   });
 
   it('--help lists every command including completion', () => {
@@ -219,5 +219,70 @@ describe('integration: config command', () => {
     const r = runCli(['config', 'set', 'api_base', 'not-a-url']);
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(/api_base must be a valid http\(s\) URL/);
+  });
+});
+
+describe('integration: config telemetry subcommand', () => {
+  it('config telemetry on writes telemetry: "on" to the config file', () => {
+    const r = runCli(['config', 'telemetry', 'on']);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/telemetry on/);
+    const list = runCli(['config', 'list']);
+    expect(list.stdout).toMatch(/"telemetry":\s*"on"/);
+  });
+
+  it('config telemetry off overwrites to "off"', () => {
+    runCli(['config', 'telemetry', 'on']);
+    const r = runCli(['config', 'telemetry', 'off']);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/telemetry off/);
+    const list = runCli(['config', 'list']);
+    expect(list.stdout).toMatch(/"telemetry":\s*"off"/);
+  });
+
+  it('config telemetry status prints clear current state + what is / is not sent', () => {
+    runCli(['config', 'telemetry', 'on']);
+    const r = runCli(['config', 'telemetry', 'status']);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/Telemetry:\s*on/);
+    expect(r.stdout).toMatch(/Source:/);
+    expect(r.stdout).toMatch(/never send/i);
+    expect(r.stdout).toMatch(/tokens/i);
+    runCli(['config', 'telemetry', 'off']);
+  });
+
+  it('config telemetry status reflects env var override', () => {
+    runCli(['config', 'telemetry', 'off']);
+    const r = runCli(['config', 'telemetry', 'status'], {
+      env: { QUELVIO_TELEMETRY: 'on' },
+    });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/Telemetry:\s*on/);
+    expect(r.stdout).toMatch(/QUELVIO_TELEMETRY/);
+  });
+
+  it('rejects invalid state', () => {
+    const r = runCli(['config', 'telemetry', 'banana']);
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/'on', 'off', or 'status'/);
+  });
+});
+
+describe('integration: telemetry fire-and-forget invariant', () => {
+  it('exit code is identical with or without QUELVIO_TELEMETRY=on (no token → both exit 2)', () => {
+    const a = runCli(['whoami'], { env: { QUELVIO_TOKEN: undefined } });
+    const b = runCli(['whoami'], {
+      env: { QUELVIO_TOKEN: undefined, QUELVIO_TELEMETRY: 'on' },
+    });
+    expect(a.status).toBe(b.status);
+    expect(a.status).toBe(2);
+  });
+
+  it('telemetry-enabled run does NOT print telemetry endpoint errors to stderr by default', () => {
+    // No token → telemetry resolver silently skips (no auth available) → nothing on stderr
+    const r = runCli(['whoami'], {
+      env: { QUELVIO_TOKEN: undefined, QUELVIO_TELEMETRY: 'on' },
+    });
+    expect(r.stderr).not.toMatch(/telemetry:/i);
   });
 });

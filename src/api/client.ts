@@ -11,6 +11,7 @@ import {
   ScopeError,
   ServerError,
 } from '../errors.js';
+import { getCommandName } from '../lib/command-context.js';
 import { VERSION } from '../version.js';
 
 const DEFAULT_BASE = 'https://api.quelvio.com';
@@ -28,6 +29,7 @@ export type ClientOptions = {
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
   random?: () => number;
+  commandName?: string | null;
 };
 
 export type RequestOptions = {
@@ -64,6 +66,7 @@ export class ApiClient {
   private readonly fetchImpl: typeof fetch;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly random: () => number;
+  private readonly commandName: string | null;
 
   constructor(opts: ClientOptions) {
     this.token = opts.token;
@@ -72,6 +75,7 @@ export class ApiClient {
     this.fetchImpl = opts.fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.sleep = opts.sleep ?? defaultSleep;
     this.random = opts.random ?? Math.random;
+    this.commandName = opts.commandName !== undefined ? opts.commandName : getCommandName();
   }
 
   async stream(opts: RequestOptions): Promise<Response> {
@@ -82,6 +86,9 @@ export class ApiClient {
       Accept: 'text/event-stream',
       'User-Agent': userAgent(),
     };
+    if (this.commandName) {
+      headers['X-Quelvio-Command'] = this.commandName;
+    }
     let body: string | undefined;
     if (opts.body !== undefined) {
       headers['Content-Type'] = 'application/json';
@@ -111,6 +118,9 @@ export class ApiClient {
       Accept: 'application/json',
       'User-Agent': userAgent(),
     };
+    if (this.commandName) {
+      headers['X-Quelvio-Command'] = this.commandName;
+    }
     let body: string | undefined;
     if (opts.body !== undefined) {
       headers['Content-Type'] = 'application/json';

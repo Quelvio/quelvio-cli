@@ -245,6 +245,17 @@ quelvio config unset api_base
 
 `config list` never prints the token — use the keychain or `QUELVIO_TOKEN` env var instead.
 
+### `quelvio config telemetry <on|off|status>`
+
+Toggle opt-in CLI telemetry, or print the current resolved state. See the
+**Telemetry policy** section below for the full schema and privacy guarantees.
+
+```sh
+quelvio config telemetry on       # writes telemetry: "on" to ~/.quelvio/config.json
+quelvio config telemetry off      # writes telemetry: "off" to ~/.quelvio/config.json
+quelvio config telemetry status   # prints current state, source, and what is / isn't sent
+```
+
 ## Configuration
 
 | Variable / file              | Purpose                                                                                          |
@@ -252,10 +263,136 @@ quelvio config unset api_base
 | `QUELVIO_TOKEN`              | Personal Access Token. Highest-precedence non-flag source.                                       |
 | `QUELVIO_API_BASE`           | Override the API base URL (defaults to `https://api.quelvio.com`). Useful for staging.           |
 | `QUELVIO_UPDATE_CHECK`       | Set to `off` (or `0` / `false`) to disable the daily npm-registry update probe. Default: on.     |
+| `QUELVIO_TELEMETRY`          | Set to `on` (or `1` / `true`) to enable opt-in command-completion telemetry. Default: off. See **Telemetry policy** below. |
 | `NO_COLOR`                   | Set to any non-empty value to suppress ANSI colors. Standard across CLIs; `quelvio` honors it.   |
 | `EDITOR` / `VISUAL`          | Used by `quelvio query` when no positional text and stdin is a TTY, or when `--editor` is set.   |
 | `~/.quelvio/config.json`     | Persisted defaults (mode `0600`). Also holds the token when the OS keychain isn't available.     |
 | `~/.quelvio/update-check.json`| Cache for the daily update-availability probe (mode `0600`). Safe to delete; will be recreated. |
+
+## Telemetry policy
+
+`quelvio` ships opt-in, anonymized command-completion events to help us
+improve the CLI — pick up regressions, see which modes get used, catch
+crashes that never get filed as issues. **Off by default.** Nothing is sent
+unless you explicitly enable it.
+
+### What's sent (when enabled)
+
+Three payload shapes, each strict — no other fields are ever included:
+
+```jsonc
+// On successful exit:
+{
+  "event_kind": "cli_command_completed",
+  "cli_version": "0.4.0",
+  "os_platform": "darwin",
+  "os_release": "23.6.0",
+  "node_version": "20.10.0",
+  "command_name": "query",
+  "duration_ms": 1234,
+  "exit_code": 0
+}
+
+// On a typed CLI error (AuthError, RateLimitError, NotFoundError, etc.):
+{
+  "event_kind": "cli_command_failed",
+  "cli_version": "0.4.0",
+  "os_platform": "darwin",
+  "os_release": "23.6.0",
+  "node_version": "20.10.0",
+  "command_name": "query",
+  "error_class": "AuthError",
+  "error_message_hash": "a3b1c5...",   // SHA-256 of the message, NEVER the message itself
+  "duration_ms": 1234,
+  "exit_code": 2
+}
+
+// On an unexpected exception:
+{
+  "event_kind": "cli_crash",
+  "cli_version": "0.4.0",
+  "os_platform": "darwin",
+  "os_release": "23.6.0",
+  "node_version": "20.10.0",
+  "command_name": "query",
+  "error_class": "TypeError",
+  "error_message_hash": "a3b1c5...",
+  "duration_ms": 1234,
+  "exit_code": 1
+}
+```
+
+### What's NEVER sent
+
+- Query text or response content
+- Auth tokens (access or refresh), `QUELVIO_TOKEN`, or any credential
+- File paths from error messages
+- Environment variable names or values
+- Full error message strings — only a SHA-256 hash, suitable for server-side
+  grouping
+- Any string field outside the three schemas above
+
+The payload schema is enforced both at the TypeScript type level and by a
+runtime whitelist that strips unexpected keys before serialization.
+
+### How to enable
+
+Three options — first match wins, in priority order:
+
+```sh
+# 1. Per-session env var (highest precedence)
+QUELVIO_TELEMETRY=on quelvio query "..."
+
+# 2. Persisted via config command (recommended for opt-in)
+quelvio config telemetry on
+
+# 3. Edit ~/.quelvio/config.json directly
+#    { "telemetry": "on" }
+```
+
+### How to disable
+
+```sh
+# Per-session
+QUELVIO_TELEMETRY=off quelvio query "..."
+
+# Persisted
+quelvio config telemetry off
+
+# Or remove the field from ~/.quelvio/config.json — default is off.
+```
+
+To inspect the resolved state (which source won, what's sent, what isn't):
+
+```sh
+quelvio config telemetry status
+```
+
+### Where the data goes
+
+Straight to your tenant's Quelvio backend at
+`/v1/enterprise/me/telemetry`, authenticated with your existing OAuth /
+PAT token. Same data-handling guarantees as the rest of Quelvio: no
+third-party telemetry vendors, no cross-tenant aggregation. You can see
+your own events at
+<https://enterprise.quelvio.com/settings/activity>.
+
+Network failures on the telemetry endpoint are silently dropped. 429 and
+5xx responses are dropped without retry. A slow telemetry endpoint can
+never delay your command's output or change its exit code (the send is
+fire-and-forget with a hard 3 second timeout).
+
+### A note on `X-Quelvio-Command`
+
+Independent of telemetry, **every** authenticated CLI request includes an
+`X-Quelvio-Command: <name>` header (e.g. `query`, `whoami`,
+`config:telemetry`). This is server-side audit attribution — it
+populates the `command_name` column of your tenant's audit log so you can
+see, per request, which CLI subcommand was invoked. The header value is
+always the parsed top-level subcommand, never the query text or any
+argument. This is on regardless of your telemetry setting; you can
+inspect the resulting attribution at
+<https://enterprise.quelvio.com/settings/activity>.
 
 ## Exit codes
 

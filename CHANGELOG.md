@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0]
+
+### Added
+- **`X-Quelvio-Command` audit header (always-on).** Every authenticated
+  request from the CLI now carries `X-Quelvio-Command: <name>` (e.g.
+  `query`, `whoami`, `config:telemetry`). The backend `AuditClientContextMiddleware`
+  (Phase 14a) reads this to populate the `command_name` column of the
+  per-tenant audit log — so member activity views can attribute each
+  request to a specific CLI subcommand. The header value is the parsed
+  top-level subcommand only; it never contains the query text or other
+  arguments. The header is omitted on unauthenticated requests (the OAuth
+  device-flow handshake) and on the telemetry request itself.
+- **Opt-in CLI telemetry (off by default).** When enabled, the CLI POSTs
+  one of three strict-schema events (`cli_command_completed`,
+  `cli_command_failed`, `cli_crash`) to `/v1/enterprise/me/telemetry`
+  after each command. Payloads are anonymized: CLI version, OS
+  platform/release, Node version, command name, duration, exit code, and
+  for failures the error class name + SHA-256 hash of the message. We
+  **never** send query text, response content, tokens, file paths,
+  environment variables, or raw error messages. Enable via
+  `QUELVIO_TELEMETRY=on`, `quelvio config telemetry on`, or
+  `{"telemetry": "on"}` in `~/.quelvio/config.json`. Env var overrides
+  config file. Sends are fire-and-forget with a 3-second hard timeout;
+  network errors and 4xx/5xx responses are silently dropped so command
+  exit code and timing are unaffected.
+- **`quelvio config telemetry <on|off|status>`** subcommand for toggling
+  and inspecting the resolved telemetry state and source (env var,
+  config file, or default).
+
+### Documentation
+- README: new **Telemetry policy** section with the three verbatim payload
+  schemas, the "never sent" list, enable/disable recipes, and a note
+  about the always-on `X-Quelvio-Command` audit attribution header.
+- README: **Configuration** table updated with `QUELVIO_TELEMETRY`.
+
 ## [0.3.0]
 
 ### Added

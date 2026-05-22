@@ -8,7 +8,13 @@ import { registerQueryCommand } from './commands/query.js';
 import { registerSourceCommand } from './commands/source.js';
 import { registerWhoamiCommand } from './commands/whoami.js';
 import { QuelvioError } from './errors.js';
+import { getCommandName } from './lib/command-context.js';
 import { writeFormattedError } from './output/error-formatter.js';
+import {
+  sendCommandCompleted,
+  sendCommandCrash,
+  sendCommandFailed,
+} from './telemetry/telemetry.js';
 import { notifyIfUpdateAvailable, queueUpdateCheck } from './update-check.js';
 import { VERSION } from './version.js';
 
@@ -39,16 +45,75 @@ export function buildProgram(): Command {
 export async function runAsync(argv: readonly string[]): Promise<number> {
   queueUpdateCheck(VERSION);
   const program = buildProgram();
+  const commandName = getCommandName(argv);
+  const start = Date.now();
   let code: number;
+  let failure: unknown = null;
   try {
     await program.parseAsync([...argv]);
     const exitCode = process.exitCode;
     code = typeof exitCode === 'number' ? exitCode : 0;
   } catch (err) {
+    failure = err;
     code = handleError(err);
   }
   notifyIfUpdateAvailable();
+  emitTelemetry(commandName, start, code, failure);
   return code;
+}
+
+function emitTelemetry(
+  commandName: string | null,
+  startMs: number,
+  exitCode: number,
+  failure: unknown,
+): void {
+  if (!commandName) return;
+  const duration_ms = Math.max(0, Date.now() - startMs);
+
+  if (failure === null) {
+    sendCommandCompleted({ command_name: commandName, duration_ms, exit_code: exitCode });
+    return;
+  }
+
+  if (failure instanceof QuelvioError) {
+    sendCommandFailed({
+      command_name: commandName,
+      duration_ms,
+      exit_code: exitCode,
+      error_class: failure.name,
+      error_message: failure.message,
+    });
+    return;
+  }
+
+  if (failure && typeof failure === 'object' && 'code' in failure) {
+    const code = (failure as { code?: string }).code;
+    if (
+      code === 'commander.help' ||
+      code === 'commander.helpDisplayed' ||
+      code === 'commander.version'
+    ) {
+      return;
+    }
+  }
+
+  const err = failure as { name?: string; message?: string; constructor?: { name?: string } };
+  const error_class =
+    err && typeof err.name === 'string' && err.name.length > 0
+      ? err.name
+      : (err?.constructor?.name ?? 'Error');
+  const error_message =
+    err && typeof err.message === 'string' && err.message.length > 0
+      ? err.message
+      : String(failure);
+  sendCommandCrash({
+    command_name: commandName,
+    duration_ms,
+    exit_code: exitCode,
+    error_class,
+    error_message,
+  });
 }
 
 export function run(argv: readonly string[]): void {
