@@ -135,7 +135,23 @@ quelvio query --json "what is our SLA?" | jq '.synthesis'
 
 If no positional text is given:
 - piped stdin is read and used as the query;
-- otherwise `$EDITOR` (or `vi`) opens for a multi-line prompt.
+- otherwise `$EDITOR` (then `$VISUAL`, then `vi`) opens for a multi-line prompt
+  in a `.md` scratch file. Lines starting with `#` are stripped. Saving an
+  empty buffer exits 0 with `Empty query, cancelled.`
+
+To force the editor even when text is on the command line, pass `--editor`.
+To read from stdin explicitly, pass the literal `-` as the positional
+argument: `cat prompt.md | quelvio query -`.
+
+#### Progress feedback
+
+Long-running queries (typically `--mode deep`) show a one-line spinner on
+stderr while the request is in flight. Standard and fast modes show a single
+"Querying..." line; deep mode advances through "Connecting →
+Retrieving → Re-ranking → Synthesizing" on a heuristic timer. The
+spinner is deferred 500 ms so cache-hit responses (sub-500 ms) stay silent,
+and it is suppressed when `--json` or `--quiet` is set, or when stderr is
+not a TTY (CI / piped output).
 
 Default output (TTY):
 
@@ -187,6 +203,27 @@ Auth method:  pat
 Token prefix: qlv_pat_a1b2...
 ```
 
+### `quelvio completion <bash|zsh|fish>`
+
+Print a shell completion script to stdout. Source it into your shell to get
+tab-completion for command names, `--mode` values, and the `config` /
+`completion` subcommand trees.
+
+```sh
+# bash
+echo 'source <(quelvio completion bash)' >> ~/.bashrc
+
+# zsh
+echo 'source <(quelvio completion zsh)' >> ~/.zshrc
+
+# fish
+quelvio completion fish > ~/.config/fish/completions/quelvio.fish
+```
+
+Restart your shell (or `exec $SHELL`) and `quelvio <Tab>` should
+autocomplete. The script is hand-written and self-contained — no runtime
+dependency on the user's shell at install time.
+
 ### `quelvio config <list|get|set|unset>`
 
 Persist defaults in `~/.quelvio/config.json` so you don't repeat flags.
@@ -214,9 +251,11 @@ quelvio config unset api_base
 | ---------------------------- | ------------------------------------------------------------------------------------------------ |
 | `QUELVIO_TOKEN`              | Personal Access Token. Highest-precedence non-flag source.                                       |
 | `QUELVIO_API_BASE`           | Override the API base URL (defaults to `https://api.quelvio.com`). Useful for staging.           |
+| `QUELVIO_UPDATE_CHECK`       | Set to `off` (or `0` / `false`) to disable the daily npm-registry update probe. Default: on.     |
 | `NO_COLOR`                   | Set to any non-empty value to suppress ANSI colors. Standard across CLIs; `quelvio` honors it.   |
-| `EDITOR` / `VISUAL`          | Used by `quelvio query` when no positional text and stdin is a TTY.                              |
+| `EDITOR` / `VISUAL`          | Used by `quelvio query` when no positional text and stdin is a TTY, or when `--editor` is set.   |
 | `~/.quelvio/config.json`     | Persisted defaults (mode `0600`). Also holds the token when the OS keychain isn't available.     |
+| `~/.quelvio/update-check.json`| Cache for the daily update-availability probe (mode `0600`). Safe to delete; will be recreated. |
 
 ## Exit codes
 

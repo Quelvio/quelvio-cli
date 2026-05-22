@@ -1,5 +1,5 @@
 import { resolveBaseUrl } from '../api/client.js';
-import { AuthError, NotAuthenticatedError } from '../errors.js';
+import { NotAuthenticatedError, RefreshFailedError } from '../errors.js';
 import { DeviceFlowError, refreshToken as oauthRefresh } from './device-flow.js';
 import { type AuthEntry, getStoredAuth, setStoredAuth } from './keychain.js';
 
@@ -83,10 +83,7 @@ async function maybeRefresh(entry: AuthEntry, opts: ResolveOptions): Promise<Aut
     return next;
   } catch (err) {
     if (err instanceof DeviceFlowError) {
-      throw new AuthError(
-        'OAuth refresh failed. Run `quelvio login` to re-authenticate.',
-        err.code,
-      );
+      throw new RefreshFailedError(err.code);
     }
     throw err;
   }
