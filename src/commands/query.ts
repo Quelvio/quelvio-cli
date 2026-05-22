@@ -6,6 +6,7 @@ import type { Command } from 'commander';
 import { readConfigFile } from '../config/store.js';
 import { GenericError } from '../errors.js';
 import { type QueryResponse, formatQueryResponse } from '../output/formatters.js';
+import { createDeepSpinner, createSpinner, shouldShowSpinner } from '../output/progress.js';
 import { type CommonOpts, addCommonOpts, buildClient, emitJson } from './common.js';
 
 type QueryOpts = CommonOpts & {
@@ -14,7 +15,12 @@ type QueryOpts = CommonOpts & {
   domain?: string;
   stream?: boolean;
   wait?: boolean;
+  editor?: boolean;
 };
+
+const EDITOR_HEADER =
+  '# Type your query below. Lines starting with # are ignored.\n' +
+  '# Save and quit to submit. Empty content cancels the query.\n';
 
 const VALID_MODES = new Set(['fast', 'standard', 'deep']);
 
@@ -32,11 +38,19 @@ async function readStdin(): Promise<string> {
   });
 }
 
+export function stripEditorComments(raw: string): string {
+  return raw
+    .split('\n')
+    .filter((line) => !line.startsWith('#'))
+    .join('\n')
+    .trim();
+}
+
 function openEditor(): string {
   const editor = process.env.EDITOR || process.env.VISUAL || 'vi';
   const dir = mkdtempSync(join(tmpdir(), 'quelvio-query-'));
   const file = join(dir, 'QUERY.md');
-  writeFileSync(file, '# Type your query below. Lines starting with # are ignored.\n');
+  writeFileSync(file, EDITOR_HEADER);
   const result = spawnSync(editor, [file], { stdio: 'inherit' });
   if (result.status !== 0) {
     throw new GenericError(`editor '${editor}' exited with code ${result.status}`);
@@ -47,15 +61,21 @@ function openEditor(): string {
   } catch {
     // ignore
   }
-  return raw
-    .split('\n')
-    .filter((line) => !line.startsWith('#'))
-    .join('\n')
-    .trim();
+  return stripEditorComments(raw);
 }
 
-async function resolveQueryText(positional: string | undefined): Promise<string> {
-  if (positional && positional.length > 0) return positional;
+async function resolveQueryText(
+  positional: string | undefined,
+  opts: { forceEditor?: boolean } = {},
+): Promise<string | null> {
+  if (opts.forceEditor) return openEditor();
+  if (positional && positional.length > 0) {
+    if (positional === '-') {
+      const piped = await readStdin();
+      return piped.length > 0 ? piped : null;
+    }
+    return positional;
+  }
   if (!process.stdin.isTTY) {
     const piped = await readStdin();
     if (piped.length > 0) return piped;
@@ -135,7 +155,8 @@ export function registerQueryCommand(program: Command): void {
     .option('--max-sources <n>', 'max source chunks to return (1-10)', '5')
     .option('--domain <domain>', 'optional taxonomy domain filter')
     .option('--stream', 'request SSE streaming output')
-    .option('--no-wait', 'return query_id immediately for async polling');
+    .option('--no-wait', 'return query_id immediately for async polling')
+    .option('--editor', 'open $EDITOR for the query text, ignoring any positional argument');
 
   addCommonOpts(cmd);
 
@@ -155,7 +176,13 @@ export function registerQueryCommand(program: Command): void {
     );
 
     const positional = textParts.join(' ').trim();
-    const queryText = await resolveQueryText(positional || undefined);
+    const queryText = await resolveQueryText(positional || undefined, {
+      forceEditor: opts.editor === true,
+    });
+    if (queryText === null) {
+      process.stdout.write('Empty query, cancelled.\n');
+      return;
+    }
     if (!queryText) {
       throw new GenericError('no query text provided');
     }
@@ -194,11 +221,28 @@ export function registerQueryCommand(program: Command): void {
       }
     }
 
-    const resp = await client.request<QueryResponse>({
-      method: 'POST',
-      path: '/v1/enterprise/query',
-      body,
+    const showSpinner = shouldShowSpinner({
+      ...(opts.json ? { json: true } : {}),
+      ...(opts.quiet ? { quiet: true } : {}),
     });
+    const spinner =
+      cliMode === 'deep'
+        ? createDeepSpinner({ enabled: showSpinner })
+        : createSpinner({ text: 'Querying...', enabled: showSpinner });
+    spinner.start();
+
+    let resp: QueryResponse;
+    try {
+      resp = await client.request<QueryResponse>({
+        method: 'POST',
+        path: '/v1/enterprise/query',
+        body,
+      });
+    } catch (err) {
+      spinner.fail();
+      throw err;
+    }
+    spinner.stop();
 
     if (opts.json) {
       emitJson(resp);

@@ -3,11 +3,13 @@ import { readConfigFile } from '../config/store.js';
 import {
   AUTH_FAILED_MESSAGE,
   AuthError,
+  BadRequestError,
   GenericError,
   NetworkError,
   NotFoundError,
   RateLimitError,
   ScopeError,
+  ServerError,
 } from '../errors.js';
 import { VERSION } from '../version.js';
 
@@ -96,7 +98,7 @@ export class ApiClient {
     }
     this.log(`← ${response.status} ${response.statusText} (stream)`);
     if (!response.ok) {
-      throw await this.mapErrorResponse(response);
+      throw await this.mapErrorResponse(response, opts.path);
     }
     return response;
   }
@@ -145,7 +147,7 @@ export class ApiClient {
         continue;
       }
 
-      throw await this.mapErrorResponse(response);
+      throw await this.mapErrorResponse(response, opts.path);
     }
 
     throw lastErr instanceof Error ? lastErr : new GenericError('Request failed');
@@ -183,17 +185,19 @@ export class ApiClient {
     }
   }
 
-  private async mapErrorResponse(response: Response): Promise<Error> {
+  private async mapErrorResponse(response: Response, path: string): Promise<Error> {
     const detail = await this.extractErrorDetail(response);
     const message = detail ?? `${response.status} ${response.statusText}`;
 
     switch (response.status) {
+      case 400:
+        return new BadRequestError(detail ?? `Bad request: ${response.statusText}`);
       case 401:
         return new AuthError(AUTH_FAILED_MESSAGE, detail);
       case 403:
         return new ScopeError(`Forbidden: ${message}`);
       case 404:
-        return new NotFoundError(`Not found: ${message}`);
+        return new NotFoundError(`Not found: ${message}`, path);
       case 429: {
         const retryAfterHeader = response.headers.get('retry-after');
         const retryAfter = retryAfterHeader ? Number.parseInt(retryAfterHeader, 10) : null;
@@ -205,6 +209,12 @@ export class ApiClient {
         );
       }
       default:
+        if (response.status >= 500 && response.status < 600) {
+          return new ServerError(
+            `Server error: ${response.status} ${response.statusText}`,
+            response.status,
+          );
+        }
         return new GenericError(`${response.status} ${response.statusText}: ${message}`);
     }
   }

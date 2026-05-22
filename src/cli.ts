@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { registerCompletionCommand } from './commands/completion.js';
 import { registerConfigCommand } from './commands/config.js';
 import { registerDomainsCommand } from './commands/domains.js';
 import { registerLoginCommand } from './commands/login.js';
@@ -6,8 +7,9 @@ import { registerLogoutCommand } from './commands/logout.js';
 import { registerQueryCommand } from './commands/query.js';
 import { registerSourceCommand } from './commands/source.js';
 import { registerWhoamiCommand } from './commands/whoami.js';
-import { AuthError, QuelvioError, RateLimitError } from './errors.js';
-import { formatError } from './output/formatters.js';
+import { QuelvioError } from './errors.js';
+import { writeFormattedError } from './output/error-formatter.js';
+import { notifyIfUpdateAvailable, queueUpdateCheck } from './update-check.js';
 import { VERSION } from './version.js';
 
 function isVerbose(): boolean {
@@ -29,19 +31,24 @@ export function buildProgram(): Command {
   registerSourceCommand(program);
   registerWhoamiCommand(program);
   registerConfigCommand(program);
+  registerCompletionCommand(program);
 
   return program;
 }
 
 export async function runAsync(argv: readonly string[]): Promise<number> {
+  queueUpdateCheck(VERSION);
   const program = buildProgram();
+  let code: number;
   try {
     await program.parseAsync([...argv]);
-    const code = process.exitCode;
-    return typeof code === 'number' ? code : 0;
+    const exitCode = process.exitCode;
+    code = typeof exitCode === 'number' ? exitCode : 0;
   } catch (err) {
-    return handleError(err);
+    code = handleError(err);
   }
+  notifyIfUpdateAvailable();
+  return code;
 }
 
 export function run(argv: readonly string[]): void {
@@ -57,14 +64,7 @@ export function run(argv: readonly string[]): void {
 
 function handleError(err: unknown): number {
   if (err instanceof QuelvioError) {
-    process.stderr.write(`${formatError(err)}\n`);
-    if (err instanceof AuthError && err.backendDetail && isVerbose()) {
-      process.stderr.write(`debug: backend response: ${err.backendDetail}\n`);
-    }
-    if (err instanceof RateLimitError && err.retryAfterSeconds !== null) {
-      process.stderr.write(`hint: retry in ${err.retryAfterSeconds}s\n`);
-    }
-    return err.exitCode;
+    return writeFormattedError(err, isVerbose());
   }
   if (err && typeof err === 'object' && 'code' in err) {
     const code = (err as { code?: string }).code;
@@ -85,7 +85,5 @@ function handleError(err: unknown): number {
       return 1;
     }
   }
-  const msg = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`error: ${msg}\n`);
-  return 1;
+  return writeFormattedError(err, isVerbose());
 }

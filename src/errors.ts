@@ -33,16 +33,26 @@ export const AUTH_FAILED_MESSAGE =
 export class NotAuthenticatedError extends AuthError {
   constructor() {
     super(
-      "No authentication token found. Set QUELVIO_TOKEN to a Personal Access Token from https://enterprise.quelvio.com/account, or run 'quelvio login' once available (Phase 6).",
+      "No authentication token found. Run 'quelvio login' to sign in, or set QUELVIO_TOKEN to a Personal Access Token from https://enterprise.quelvio.com/account.",
     );
     this.name = 'NotAuthenticatedError';
   }
 }
 
+export class RefreshFailedError extends AuthError {
+  constructor(detail: string | null = null) {
+    super('OAuth refresh failed. Run `quelvio login` to re-authenticate.', detail);
+    this.name = 'RefreshFailedError';
+  }
+}
+
 export class NotFoundError extends QuelvioError {
-  constructor(message: string) {
+  readonly path: string | null;
+
+  constructor(message: string, path: string | null = null) {
     super(message, 3);
     this.name = 'NotFoundError';
+    this.path = path;
   }
 }
 
@@ -77,5 +87,22 @@ export class NetworkError extends QuelvioError {
     if (cause !== undefined) {
       (this as { cause?: unknown }).cause = cause;
     }
+  }
+}
+
+export class BadRequestError extends QuelvioError {
+  constructor(message: string) {
+    super(message, 1);
+    this.name = 'BadRequestError';
+  }
+}
+
+export class ServerError extends QuelvioError {
+  readonly statusCode: number;
+
+  constructor(message: string, statusCode: number) {
+    super(message, 1);
+    this.name = 'ServerError';
+    this.statusCode = statusCode;
   }
 }

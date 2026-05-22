@@ -45,18 +45,76 @@ function runCli(args: string[], opts: RunOpts = {}) {
 }
 
 describe('integration: --version / --help', () => {
-  it('--version prints 0.2.0', () => {
+  it('--version prints 0.3.0', () => {
     const r = runCli(['--version']);
     expect(r.status).toBe(0);
-    expect(r.stdout.trim()).toBe('0.2.0');
+    expect(r.stdout.trim()).toBe('0.3.0');
   });
 
-  it('--help lists every command', () => {
+  it('--help lists every command including completion', () => {
     const r = runCli(['--help']);
     expect(r.status).toBe(0);
-    for (const cmd of ['login', 'logout', 'query', 'domains', 'source', 'whoami', 'config']) {
+    for (const cmd of [
+      'login',
+      'logout',
+      'query',
+      'domains',
+      'source',
+      'whoami',
+      'config',
+      'completion',
+    ]) {
       expect(r.stdout).toMatch(new RegExp(`\\b${cmd}\\b`));
     }
+  });
+});
+
+describe('integration: shell completion', () => {
+  it('quelvio completion bash emits a sourceable bash script', () => {
+    const r = runCli(['completion', 'bash']);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('_quelvio_completions');
+    expect(r.stdout).toContain('complete -F _quelvio_completions quelvio');
+    expect(r.stdout).toContain('fast standard deep');
+  });
+
+  it('quelvio completion zsh emits a #compdef directive', () => {
+    const r = runCli(['completion', 'zsh']);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/^#compdef quelvio/);
+  });
+
+  it('quelvio completion fish emits per-command complete calls', () => {
+    const r = runCli(['completion', 'fish']);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/complete -c quelvio/);
+  });
+
+  it('quelvio completion with no shell prints install hints', () => {
+    const r = runCli(['completion']);
+    expect(r.stderr).toMatch(/usage: quelvio completion/);
+    expect(r.stderr).toMatch(/\.bashrc/);
+    expect(r.stderr).toMatch(/\.zshrc/);
+    expect(r.stderr).toMatch(/fish\/completions/);
+  });
+});
+
+describe('integration: smart error hints', () => {
+  it('whoami without token shows a "run quelvio login" hint and no Phase 6 reference', () => {
+    const r = runCli(['whoami'], { env: { QUELVIO_TOKEN: undefined } });
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/Hint: run `quelvio login`/);
+    expect(r.stderr).not.toMatch(/Phase 6/);
+    expect(r.stderr).not.toMatch(/once available/);
+  });
+
+  it('backend 401 surfaces a session-expired hint on a new line', () => {
+    const r = runCli(['whoami'], {
+      env: { QUELVIO_TOKEN: 'qlv_pat_bogus_for_hint_test' },
+    });
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/Authentication failed/);
+    expect(r.stderr).toMatch(/Hint:.*session has expired/);
   });
 });
 
