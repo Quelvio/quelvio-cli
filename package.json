@@ -1,6 +1,6 @@
 {
   "name": "@quelvio/cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Quelvio command-line interface.",
   "license": "MIT",
   "type": "module",

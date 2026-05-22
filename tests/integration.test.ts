@@ -45,16 +45,16 @@ function runCli(args: string[], opts: RunOpts = {}) {
 }
 
 describe('integration: --version / --help', () => {
-  it('--version prints 0.1.0', () => {
+  it('--version prints 0.2.0', () => {
     const r = runCli(['--version']);
     expect(r.status).toBe(0);
-    expect(r.stdout.trim()).toBe('0.1.0');
+    expect(r.stdout.trim()).toBe('0.2.0');
   });
 
   it('--help lists every command', () => {
     const r = runCli(['--help']);
     expect(r.status).toBe(0);
-    for (const cmd of ['query', 'domains', 'source', 'whoami', 'config']) {
+    for (const cmd of ['login', 'logout', 'query', 'domains', 'source', 'whoami', 'config']) {
       expect(r.stdout).toMatch(new RegExp(`\\b${cmd}\\b`));
     }
   });
@@ -108,6 +108,14 @@ describe('integration: 401 message rendering', () => {
     expect(r.status).toBe(2);
     expect(r.stderr).toMatch(/Authentication failed/);
     expect(r.stderr).toMatch(/debug: backend response:/);
+  });
+});
+
+describe('integration: logout idempotency', () => {
+  it('logout when not logged in returns exit 0 with friendly message', () => {
+    const r = runCli(['logout'], { env: { QUELVIO_TOKEN: undefined } });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/Not logged in/);
   });
 });
 

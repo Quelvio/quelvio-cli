@@ -1,6 +1,6 @@
 import type { Command } from 'commander';
 import { ApiClient } from '../api/client.js';
-import { resolveToken } from '../auth/token-resolver.js';
+import { type AuthMethod, resolveToken } from '../auth/token-resolver.js';
 import { setColorMode } from '../output/colors.js';
 
 export type CommonOpts = {
@@ -30,15 +30,24 @@ export async function buildClient(opts: CommonOpts): Promise<{
   client: ApiClient;
   token: string;
   tokenSource: string;
+  authMethod: AuthMethod;
 }> {
   applyColorFlag(opts);
-  const resolved = await resolveToken({ flagToken: opts.token });
+  const resolved = await resolveToken({
+    flagToken: opts.token,
+    ...(opts.verbose ? { verbose: true } : {}),
+  });
   const debug = opts.verbose ? (line: string) => process.stderr.write(`${line}\n`) : undefined;
   const client = new ApiClient({
     token: resolved.token,
     debug,
   });
-  return { client, token: resolved.token, tokenSource: resolved.source };
+  return {
+    client,
+    token: resolved.token,
+    tokenSource: resolved.source,
+    authMethod: resolved.authMethod,
+  };
 }
 
 export function emitJson(value: unknown): void {

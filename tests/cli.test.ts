@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { buildProgram } from '../src/cli.js';
 
 describe('cli', () => {
-  it('--version prints 0.1.0', () => {
+  it('--version prints 0.2.0', () => {
     const program = buildProgram().exitOverride();
     const writeOut = vi.fn();
     program.configureOutput({ writeOut, writeErr: writeOut });
@@ -12,7 +12,7 @@ describe('cli', () => {
     );
 
     const printed = writeOut.mock.calls.map((c) => String(c[0])).join('');
-    expect(printed.trim()).toBe('0.1.0');
+    expect(printed.trim()).toBe('0.2.0');
   });
 
   it('--help lists every command', () => {
@@ -25,7 +25,7 @@ describe('cli', () => {
     );
 
     const printed = writeOut.mock.calls.map((c) => String(c[0])).join('');
-    for (const cmd of ['query', 'domains', 'source', 'whoami', 'config']) {
+    for (const cmd of ['login', 'logout', 'query', 'domains', 'source', 'whoami', 'config']) {
       expect(printed).toMatch(new RegExp(`\\b${cmd}\\b`));
     }
   });

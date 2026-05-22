@@ -46,7 +46,7 @@ function coerce(key: AllowedKey, value: string): string | number {
 function maskSensitive(cfg: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(cfg)) {
-    if (k === 'token') continue;
+    if (k === 'token' || k === 'auth') continue;
     out[k] = v;
   }
   return out;
