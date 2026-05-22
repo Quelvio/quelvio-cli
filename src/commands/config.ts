@@ -1,7 +1,8 @@
 import type { Command } from 'commander';
 import { CONFIG_FILE } from '../config/paths.js';
-import { readConfigFile, writeConfigFile } from '../config/store.js';
+import { type ConfigFile, readConfigFile, writeConfigFile } from '../config/store.js';
 import { GenericError } from '../errors.js';
+import { resolveTelemetry } from '../telemetry/is-enabled.js';
 
 const ALLOWED_KEYS = ['api_base', 'default_mode', 'default_max_sources'] as const;
 type AllowedKey = (typeof ALLOWED_KEYS)[number];
@@ -106,4 +107,45 @@ export function registerConfigCommand(program: Command): void {
       writeConfigFile(cfg);
       process.stdout.write(`unset ${k}\n`);
     });
+
+  cmd
+    .command('telemetry <state>')
+    .description('Enable, disable, or print opt-in CLI telemetry status (on|off|status)')
+    .action((state: string) => {
+      const v = state.trim().toLowerCase();
+      if (v === 'status') {
+        printTelemetryStatus();
+        return;
+      }
+      if (v !== 'on' && v !== 'off') {
+        throw new GenericError(`telemetry state must be 'on', 'off', or 'status' (got '${state}')`);
+      }
+      const cfg = readConfigFile();
+      const next: ConfigFile = { ...cfg, telemetry: v };
+      writeConfigFile(next);
+      process.stdout.write(`telemetry ${v}\n`);
+    });
+}
+
+function printTelemetryStatus(): void {
+  const resolved = resolveTelemetry();
+  const state = resolved.enabled ? 'on' : 'off';
+  const sourceLabel =
+    resolved.source === 'env'
+      ? 'env (QUELVIO_TELEMETRY)'
+      : resolved.source === 'config'
+        ? `config file (${CONFIG_FILE})`
+        : 'default (off)';
+  process.stdout.write(`Telemetry: ${state}\n`);
+  process.stdout.write(`Source:    ${sourceLabel}\n`);
+  process.stdout.write('\n');
+  process.stdout.write('What we send (only when enabled):\n');
+  process.stdout.write('  • CLI version, OS platform/release, Node version\n');
+  process.stdout.write('  • Command name (e.g. query, login), duration, exit code\n');
+  process.stdout.write('  • For failures: error class name + SHA-256 hash of the error message\n');
+  process.stdout.write('\n');
+  process.stdout.write('What we NEVER send:\n');
+  process.stdout.write('  • Query text or response content\n');
+  process.stdout.write('  • Authentication tokens or refresh tokens\n');
+  process.stdout.write('  • File paths, environment variables, or raw error messages\n');
 }

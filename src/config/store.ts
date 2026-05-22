@@ -14,6 +14,7 @@ export type ConfigFile = {
   api_base?: string;
   default_mode?: string;
   default_max_sources?: number;
+  telemetry?: 'on' | 'off';
 };
 
 export function readConfigFile(): ConfigFile {
