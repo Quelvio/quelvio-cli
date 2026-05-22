@@ -1,18 +1,20 @@
 # @quelvio/cli
 
-> Query your enterprise knowledge brain from the command line.
+> Query your company's knowledge brain from the command line.
 
-`quelvio` is the official command-line client for the Quelvio Enterprise API. It puts every connected source — Drive, SharePoint, Confluence, Slack, Notion — behind a single, scriptable interface that returns cited, synthesized answers in human-readable or JSON form. Every request is attributed to the human running it via their Personal Access Token, so audits stay clean and per-employee permission filters apply automatically.
+`quelvio` is the official command-line client for the Quelvio Enterprise API. It puts every connected source — Drive, SharePoint, Confluence, Slack, Notion, GitHub — behind a single, scriptable interface that returns cited, synthesized answers in human or JSON form. Every request is attributed to whoever runs it (OAuth login, Personal Access Token, or Service Account), so audits stay clean and per-employee permission filters apply automatically.
 
 ## Install
 
-> The CLI is pre-release. `npm` install will work once Phase 4 publishes the package; native binaries ship in Phase 11.
+```sh
+npm install -g @quelvio/cli
+quelvio login
+quelvio query "what does our team know about kT pricing?"
+```
+
+Verify the install:
 
 ```sh
-# After Phase 4 ships:
-npm i -g @quelvio/cli
-
-# Verify:
 quelvio --version
 ```
 
@@ -69,16 +71,21 @@ quelvio whoami
 
 The token is never echoed to stdout, stderr, or logs. The keychain or config file holds the value at rest; `--verbose` HTTP traces redact the `Authorization` header. Refresh tokens are treated the same as access tokens — never logged, never printed.
 
-**Authentication methods:**
-- **OAuth device login (default in 0.2.0).** `quelvio login` performs the
+**Authentication methods**, in order of UX preference:
+
+- **OAuth device login (recommended for humans).** `quelvio login` performs the
   RFC 8628 device-code flow against `api.quelvio.com`. The CLI persists an
   access + refresh pair in your OS keychain; the resolver auto-refreshes
   within 5 minutes of expiry. `quelvio logout` revokes server-side and wipes
   the local entry.
-- **PAT (headless fallback).** A long-lived bearer token tied to a human user.
-  Set via `QUELVIO_TOKEN`. Best for CI workflows and ad-hoc shell scripts.
-- **Service accounts** (Phase 8/9). For headless agents and CI bots that need
-  an identity distinct from a human's.
+- **Personal Access Token (headless / scripts).** A long-lived bearer token
+  tied to a human user, prefix `qlv_pat_`. Set via `QUELVIO_TOKEN`. Best for
+  ad-hoc shell scripts and one-off automation.
+- **Service Account key (CI/CD with admin-defined scopes).** A bearer token
+  with prefix `qlv_sa_`, issued by a tenant admin and tied to a non-human
+  identity with explicit scope grants. Set via `QUELVIO_TOKEN` the same way
+  as a PAT — the CLI detects the prefix and `quelvio whoami` reports
+  `auth_method: service-account`.
 
 ## Commands
 
@@ -284,7 +291,7 @@ Three payload shapes, each strict — no other fields are ever included:
 // On successful exit:
 {
   "event_kind": "cli_command_completed",
-  "cli_version": "0.4.0",
+  "cli_version": "x.y.z",
   "os_platform": "darwin",
   "os_release": "23.6.0",
   "node_version": "20.10.0",
@@ -296,7 +303,7 @@ Three payload shapes, each strict — no other fields are ever included:
 // On a typed CLI error (AuthError, RateLimitError, NotFoundError, etc.):
 {
   "event_kind": "cli_command_failed",
-  "cli_version": "0.4.0",
+  "cli_version": "x.y.z",
   "os_platform": "darwin",
   "os_release": "23.6.0",
   "node_version": "20.10.0",
@@ -310,7 +317,7 @@ Three payload shapes, each strict — no other fields are ever included:
 // On an unexpected exception:
 {
   "event_kind": "cli_crash",
-  "cli_version": "0.4.0",
+  "cli_version": "x.y.z",
   "os_platform": "darwin",
   "os_release": "23.6.0",
   "node_version": "20.10.0",
@@ -501,7 +508,6 @@ The skills repo is MIT-licensed and open to contributions.
 - **Streaming is best-effort.** `--stream` falls back to non-streaming on backends that don't expose `/v1/enterprise/query/stream` or return a non-SSE content-type.
 - **No offline mode.** Every command except `config` requires connectivity to `api.quelvio.com`.
 - **Result count clamped at 10.** The backend caps `--max-sources` at 10 to match marketplace behavior; values above 10 are silently clamped down.
-- **Service accounts are not yet supported.** Ship in Phase 8/9.
 
 ## License
 
