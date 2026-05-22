@@ -1,10 +1,12 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const DIST = join(__dirname, '..', 'dist', 'index.js');
+const PKG_VERSION = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'))
+  .version as string;
 let tempHome: string;
 
 beforeAll(() => {
@@ -45,10 +47,10 @@ function runCli(args: string[], opts: RunOpts = {}) {
 }
 
 describe('integration: --version / --help', () => {
-  it('--version prints 0.4.0', () => {
+  it('--version prints the package.json version', () => {
     const r = runCli(['--version']);
     expect(r.status).toBe(0);
-    expect(r.stdout.trim()).toBe('0.4.0');
+    expect(r.stdout.trim()).toBe(PKG_VERSION);
   });
 
   it('--help lists every command including completion', () => {
